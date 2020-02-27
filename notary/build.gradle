@@ -1,0 +1,32 @@
+apply plugin: 'java'
+
+ext {
+    corda_release_version = '4.3'
+}
+
+group 'com.hedera.hashgraph'
+version '0.0.1'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda' }
+    maven { url 'https://repo.gradle.org/gradle/libs-releases' }
+    maven { url "https://software.r3.com/artifactory/corda-dependencies" }
+}
+
+dependencies {
+    compile("com.hedera.hashgraph:sdk:1.1.1") {
+        // exclude group: 'org.bouncycastle'
+        exclude group: 'io.github.novacrypto'
+    }
+
+    compile("io.grpc:grpc-okhttp:1.26.0")
+
+    // Corda dependencies.
+    compileOnly "net.corda:corda-node:$corda_release_version"
+    compileOnly "net.corda:corda-core:$corda_release_version"
+}

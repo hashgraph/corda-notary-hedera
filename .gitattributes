@@ -1,0 +1,3 @@
+* text=auto
+**/gradle/wrapper/gradle-wrapper.jar binary
+**/gradlew.bat text eol=crlf
