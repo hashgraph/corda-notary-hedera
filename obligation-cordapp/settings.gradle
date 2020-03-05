@@ -1,0 +1,3 @@
+rootProject.name = 'obligation-cordapp'
+include 'corda-hcs-notary'
+project(':corda-hcs-notary').projectDir = file('../notary')

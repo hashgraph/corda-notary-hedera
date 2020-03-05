@@ -14,12 +14,12 @@ import java.util.Collections;
 
 import co.paralleluniverse.fibers.Suspendable;
 
-public class HcsNotaryServiceFlow extends FlowLogic<Void> {
+public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
 
-    private final HcsNotaryService notaryService;
-    private final FlowSession otherPartySession;
+    protected final HcsNotaryService notaryService;
+    protected final FlowSession otherPartySession;
 
-    public HcsNotaryServiceFlow(HcsNotaryService notaryService, FlowSession otherPartySession) {
+    protected HcsNotaryServiceFlow(HcsNotaryService notaryService, FlowSession otherPartySession) {
         this.notaryService = notaryService;
         this.otherPartySession = otherPartySession;
     }
@@ -29,6 +29,8 @@ public class HcsNotaryServiceFlow extends FlowLogic<Void> {
     public Void call() throws FlowException {
         NotarisationPayload payload = otherPartySession.receive(NotarisationPayload.class)
                 .unwrap(p -> p);
+
+        validateTransaction(payload);
 
         CoreTransaction txn = payload.getCoreTransaction();
 
@@ -54,4 +56,12 @@ public class HcsNotaryServiceFlow extends FlowLogic<Void> {
 
         return null;
     }
+
+    /**
+     * Validate that the transaction in the given payload is valid for the current contract.
+     *
+     * @param payload
+     * @throws FlowException
+     */
+    protected abstract void validateTransaction(NotarisationPayload payload) throws FlowException;
 }

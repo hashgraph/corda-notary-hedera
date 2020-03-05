@@ -86,11 +86,11 @@ public abstract class HcsNotaryService extends NotaryService {
 
     @NotNull
     @Override
-    public FlowLogic<Void> createServiceFlow(@NotNull FlowSession otherPartySession) {
-        final Duration eta = Duration.ofSeconds(notaryConfig.getEtaMessageThresholdSeconds());
-
-        return new HcsNotaryServiceFlow(this, otherPartySession);
+    public final FlowLogic<Void> createServiceFlow(@NotNull FlowSession otherPartySession) {
+        return createNotaryServiceFlow(otherPartySession);
     }
+
+    public abstract HcsNotaryServiceFlow createNotaryServiceFlow(@NotNull FlowSession otherSession);
 
     long submitTransactionSpends(CoreTransaction transaction) throws HederaStatusException {
         System.out.println("submitting transaction spends");

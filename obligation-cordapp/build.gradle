@@ -1,0 +1,132 @@
+apply plugin: 'java'
+apply plugin: 'net.corda.plugins.cordapp'
+apply plugin: 'net.corda.plugins.cordformation'
+apply plugin: 'net.corda.plugins.quasar-utils'
+
+buildscript {
+    ext {
+        corda_gradle_plugins_version = '5.0.4'
+        quasar_version = '0.7.10'
+        corda_platform_version = '5'
+        corda_release_version = '4.3'
+    }
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda' }
+        maven { url 'https://repo.gradle.org/gradle/libs-releases' }
+        maven { url "https://software.r3.com/artifactory/corda-dependencies" }
+    }
+
+    dependencies {
+        classpath "net.corda.plugins:cordapp:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:cordformation:$corda_gradle_plugins_version"
+        classpath "net.corda.plugins:quasar-utils:$corda_gradle_plugins_version"
+    }
+}
+
+group 'com.hedera.hashgraph'
+version '0.0.1'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://ci-artifactory.corda.r3cev.com/artifactory/corda' }
+    maven { url 'https://repo.gradle.org/gradle/libs-releases' }
+    maven { url "https://software.r3.com/artifactory/corda-dependencies" }
+}
+
+cordapp {
+    targetPlatformVersion corda_platform_version.toInteger()
+    minimumPlatformVersion corda_platform_version.toInteger()
+    contract {
+        name "HCS Demo CorDapp"
+        vendor "Hedera Hashgraph"
+        licence "Apache License, Version 2.0"
+        versionId 1
+    }
+    workflow {
+        name "HCS Demo CorDapp"
+        vendor "Hedera Hashgraph"
+        licence "Apache License, Version 2.0"
+        versionId 1
+    }
+}
+
+dependencies {
+    compile project(":corda-hcs-notary")
+
+    // Corda dependencies.
+    compileOnly "net.corda:corda-node:$corda_release_version"
+
+    cordaCompile "net.corda:corda-core:$corda_release_version"
+    cordaCompile "net.corda:corda-jackson:$corda_release_version"
+    cordaCompile "net.corda:corda-rpc:$corda_release_version"
+    cordaCompile "net.corda:corda-node-api:$corda_release_version"
+
+    cordaCompile project(":corda-hcs-notary")
+
+    cordaRuntime "net.corda:corda:$corda_release_version"
+
+
+    // CorDapp dependencies.
+    cordapp "net.corda:corda-finance-contracts:$corda_release_version"
+    cordapp "net.corda:corda-finance-workflows:$corda_release_version"
+    cordapp "net.corda:corda-confidential-identities:$corda_release_version"
+
+    cordapp project(":corda-hcs-notary")
+}
+
+tasks.withType(JavaCompile) {
+    // IMPORTANT
+    // otherwise Corda serialization breaks and usage of flows in CLI isn't nice
+    options.compilerArgs << '-parameters'
+}
+
+task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
+    nodeDefaults {
+        cordapp "net.corda:corda-finance-contracts:$corda_release_version"
+        cordapp "net.corda:corda-finance-workflows:$corda_release_version"
+        cordapp "net.corda:corda-confidential-identities:$corda_release_version"
+
+        projectCordapp {}
+
+        rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
+    }
+    node {
+        name "O=Notary,L=London,C=GB"
+        notary = [
+                validating: false,
+                className: "com.hedera.hashgraph.corda_hcs.notary.HcsNotaryService"
+        ]
+
+        p2pPort 10002
+        rpcSettings {
+            address("localhost:10003")
+            adminAddress("localhost:10043")
+        }
+    }
+    node {
+        name "O=PartyA,L=London,C=GB"
+        p2pPort 10005
+        rpcSettings {
+            address("localhost:10006")
+            adminAddress("localhost:10046")
+        }
+    }
+    node {
+        name "O=PartyB,L=New York,C=US"
+        p2pPort 10008
+        rpcSettings {
+            address("localhost:10009")
+            adminAddress("localhost:10049")
+        }
+    }
+}
