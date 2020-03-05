@@ -27,8 +27,8 @@ public class SerializeTransaction {
 
     // SERIALIZED FORMAT:
     // byte[32] transaction ID
-    // int4 inputsLen
-    // int4 refsLen
+    // int4 inputsLen = inputs.size()
+    // int4 refsLen = refs.size()
     //
     // for 0 .. inputsLen:
     //   byte[32] input transaction ID
@@ -39,8 +39,8 @@ public class SerializeTransaction {
     //   int4 state index
 
     public byte[] serialize() {
-        // txn ID + lengths + (txn ID + index) * inputsLen + (txn ID + index) * refsLen
-        int capacity = 32 + 8 + inputs.size() * 36 + refs.size() * 36;
+        // txn ID + lengths + inputsLen(txn ID + index) + refsLen(txn ID + index)
+        int capacity = 32 + 4 + 4 + inputs.size() * 36 + refs.size() * 36;
 
         ByteBuffer out = ByteBuffer.allocate(capacity);
 

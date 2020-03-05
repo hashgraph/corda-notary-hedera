@@ -1,4 +1,4 @@
-notary/.gradle/
-notary/build/
-.idea/
+**/.gradle/
+**/build/
+**/.idea/
 **/*.iml

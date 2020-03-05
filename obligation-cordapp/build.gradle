@@ -61,7 +61,7 @@ cordapp {
 }
 
 dependencies {
-    compile project(":corda-hcs-notary")
+    compile "com.hedera.hashgraph:corda-hcs-notary:0.0.1"
 
     // Corda dependencies.
     compileOnly "net.corda:corda-node:$corda_release_version"
@@ -71,8 +71,6 @@ dependencies {
     cordaCompile "net.corda:corda-rpc:$corda_release_version"
     cordaCompile "net.corda:corda-node-api:$corda_release_version"
 
-    cordaCompile project(":corda-hcs-notary")
-
     cordaRuntime "net.corda:corda:$corda_release_version"
 
 
@@ -80,8 +78,6 @@ dependencies {
     cordapp "net.corda:corda-finance-contracts:$corda_release_version"
     cordapp "net.corda:corda-finance-workflows:$corda_release_version"
     cordapp "net.corda:corda-confidential-identities:$corda_release_version"
-
-    cordapp project(":corda-hcs-notary")
 }
 
 tasks.withType(JavaCompile) {
@@ -104,7 +100,7 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         name "O=Notary,L=London,C=GB"
         notary = [
                 validating: false,
-                className: "com.hedera.hashgraph.corda_hcs.notary.HcsNotaryService"
+                className: "com.hedera.hashgraph.corda_hcs.notary_demo.ObligationNotaryService"
         ]
 
         p2pPort 10002
