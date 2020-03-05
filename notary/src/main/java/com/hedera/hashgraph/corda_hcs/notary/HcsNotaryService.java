@@ -6,11 +6,14 @@ import com.hedera.hashgraph.sdk.Transaction;
 import com.hedera.hashgraph.sdk.TransactionId;
 import com.hedera.hashgraph.sdk.account.AccountId;
 import com.hedera.hashgraph.sdk.consensus.ConsensusMessageSubmitTransaction;
+import com.hedera.hashgraph.sdk.consensus.ConsensusTopicCreateTransaction;
 import com.hedera.hashgraph.sdk.consensus.ConsensusTopicId;
 import com.hedera.hashgraph.sdk.mirror.MirrorClient;
 import com.hedera.hashgraph.sdk.mirror.MirrorConsensusTopicQuery;
 import com.hedera.hashgraph.sdk.mirror.MirrorConsensusTopicResponse;
 import com.hedera.hashgraph.sdk.mirror.MirrorSubscriptionHandle;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigException;
 
 import net.corda.core.contracts.StateRef;
 import net.corda.core.crypto.Crypto;
@@ -29,12 +32,13 @@ import net.corda.core.transactions.CoreTransaction;
 import net.corda.node.services.api.ServiceHubInternal;
 import net.corda.node.services.config.NotaryConfig;
 
+import org.apache.shiro.codec.Hex;
 import org.jetbrains.annotations.NotNull;
 
 import java.security.PublicKey;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.annotation.Nullable;
@@ -47,8 +51,19 @@ public abstract class HcsNotaryService extends NotaryService {
     private final Client sdkClient;
     private final MirrorClient mirrorClient;
 
-    private static final ConsensusTopicId topicId = new ConsensusTopicId(161427);
-    private static final AccountId operatorAccountId = new AccountId(147704);
+    private final AccountId operatorAccountId;
+
+    @Nullable
+    private ConsensusTopicId topicId;
+
+    private final byte[] privateKeyBytes;
+
+    @Nullable
+    private final byte[] submitKeyBytes;
+
+    @Nullable
+    private final Ed25519PublicKey submitPublicKey;
+
 
     private final ConcurrentHashMap<StateRef, StateDestruction> stateDestructions = new ConcurrentHashMap<>();
 
@@ -61,15 +76,32 @@ public abstract class HcsNotaryService extends NotaryService {
         super();
         this.serviceHubInternal = serviceHubInternal;
         this.publicKey = publicKey;
-        this.notaryConfig = serviceHubInternal.getConfiguration().getNotary();
+        this.notaryConfig = Objects.requireNonNull(serviceHubInternal.getConfiguration().getNotary());
 
-        sdkClient = Client.forTestnet()
-            .setOperatorWith(
-                    operatorAccountId,
-                    SigningUtils.publicKey,
-                    message -> SigningUtils.sign(SigningUtils.privateKeyBytes, message));
+        Config extraConfig = Objects.requireNonNull(
+                this.notaryConfig.getExtraConfig(),
+                "required `extraConfig.hcs` key in notary config");
 
-        mirrorClient = new MirrorClient("hcs.testnet.mirrornode.hedera.com:5600");
+        final HcsConfig hcsConfig = new HcsConfig(extraConfig);
+
+        this.operatorAccountId = hcsConfig.accountId;
+        this.topicId = hcsConfig.topicId;
+
+        this.privateKeyBytes = hcsConfig.privateKey;
+        this.submitKeyBytes = hcsConfig.submitKey;
+
+        this.submitPublicKey = submitKeyBytes != null ? Ed25519PublicKey.fromPrivateKey(submitKeyBytes) : null;
+
+        sdkClient = (hcsConfig.testnet ? Client.forTestnet() : Client.forMainnet())
+                .setOperatorWith(
+                        operatorAccountId,
+                        Ed25519PublicKey.fromPrivateKey(privateKeyBytes),
+                        message -> SigningUtils.sign(privateKeyBytes, message));
+
+        mirrorClient = new MirrorClient(
+                hcsConfig.testnet
+                        ? "hcs.testnet.mirrornode.hedera.com:5600"
+                        : "hcs.mainnet.mirrornode.hedera.com:5600");
     }
 
     @NotNull
@@ -96,7 +128,7 @@ public abstract class HcsNotaryService extends NotaryService {
         System.out.println("submitting transaction spends");
 
         ConsensusMessageSubmitTransaction msgTxn = new ConsensusMessageSubmitTransaction()
-                .setTopicId(topicId);
+                .setTopicId(Objects.requireNonNull(topicId, "topic ID not set or created"));
 
         System.out.println("serializing corda transaction");
 
@@ -108,9 +140,11 @@ public abstract class HcsNotaryService extends NotaryService {
 
         System.out.println("submitting transaction to Hedera");
 
-        TransactionId txnId = hederaTxn
-                .signWith(SigningUtils.submitPublicKey, m -> SigningUtils.sign(SigningUtils.submitKeyBytes, m))
-                .execute(sdkClient);
+        if (submitKeyBytes != null && submitPublicKey != null) {
+            hederaTxn.signWith(submitPublicKey, m -> SigningUtils.sign(submitKeyBytes, m));
+        }
+
+        TransactionId txnId = hederaTxn.execute(sdkClient);
 
         System.out.println("transaction ID" + txnId);
 
@@ -174,6 +208,22 @@ public abstract class HcsNotaryService extends NotaryService {
 
     @Override
     public void start() {
+        if (topicId == null) {
+            ConsensusTopicCreateTransaction txn = new ConsensusTopicCreateTransaction()
+                    .setTopicMemo("Corda HCS Notary");
+
+            if (submitPublicKey != null) {
+                txn.setSubmitKey(submitPublicKey);
+            }
+
+            try {
+                TransactionId txnId = txn.execute(sdkClient);
+                topicId = txnId.getReceipt(sdkClient).getConsensusTopicId();
+            } catch (HederaStatusException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         subscriptionHandle = new MirrorConsensusTopicQuery()
                 .setTopicId(topicId)
                 // for demo purposes we don't care about any states before the notary started

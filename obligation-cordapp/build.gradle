@@ -100,7 +100,16 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         name "O=Notary,L=London,C=GB"
         notary = [
                 validating: false,
-                className: "com.hedera.hashgraph.corda_hcs.notary_demo.ObligationNotaryService"
+                className: "com.hedera.hashgraph.corda_hcs.notary_demo.ObligationNotaryService",
+                extraConfig: [
+                        hcs: [
+                                accountId: 147704,
+                                topicId: 161427,
+                                privateKey: "bffc5bc38cae07f381a5d5baa24086eb189b6f59f407ed87d7e3010814359843",
+                                submitKey: "9ae9d9e62f6f31154eb2ea6e4257828ace0575d97c03fa2dbfad7c20f5aa31f9",
+                                testnet: true
+                        ]
+                ]
         ]
 
         p2pPort 10002
