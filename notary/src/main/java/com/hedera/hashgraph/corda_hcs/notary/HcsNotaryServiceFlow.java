@@ -46,7 +46,7 @@ public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
             seqNumber = notaryService.submitTransactionSpends(txn);
         } catch (HederaStatusException e) {
             logger.error("error trying to submit transaction", e);
-            throw new FlowException(e);
+            throw new FlowException("an error occured while submitting an HCS message", e);
         }
 
         logger.trace("sequence number: " + seqNumber);
@@ -56,7 +56,8 @@ public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
         }
 
         logger.trace("notarizing transaction " + txn.getId());
-        otherPartySession.send(new NotarisationResponse(Collections.singletonList(notaryService.signTransaction(txn.getId()))));
+        otherPartySession.send(new NotarisationResponse(
+                Collections.singletonList(notaryService.signTransaction(txn.getId()))));
 
         return null;
     }
