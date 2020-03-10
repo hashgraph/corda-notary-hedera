@@ -4,11 +4,16 @@ import net.corda.core.contracts.StateRef;
 import net.corda.core.crypto.SecureHash;
 import net.corda.core.transactions.CoreTransaction;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SerializeTransaction {
+public final class SerializeTransaction {
+    private static final Logger logger = LoggerFactory.getLogger(SerializeTransaction.class);
+
     public final SecureHash txnId;
     public final List<StateRef> inputs;
     public final List<StateRef> refs;
@@ -44,7 +49,7 @@ public class SerializeTransaction {
 
         ByteBuffer out = ByteBuffer.allocate(capacity);
 
-        System.out.println("allocated buffer with " + capacity + " bytes");
+        logger.trace("allocated buffer with " + capacity + " bytes");
 
         txnId.putTo(out);
         out.putInt(inputs.size());
@@ -55,14 +60,14 @@ public class SerializeTransaction {
             out.putInt(input.getIndex());
         }
 
-        System.out.println("serialized inputs");
+        logger.trace("serialized inputs");
 
         for (StateRef ref : refs) {
             ref.getTxhash().putTo(out);
             out.putInt(ref.getIndex());
         }
 
-        System.out.println("serialized outputs");
+        logger.trace("serialized outputs");
 
         return out.array();
     }

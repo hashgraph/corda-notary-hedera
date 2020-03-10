@@ -7,6 +7,9 @@ import com.hedera.hashgraph.sdk.crypto.PublicKey;
 
 import org.bouncycastle.math.ec.rfc8032.Ed25519;
 
+// fixme: we can't use the `Ed25519PublicKey` type in the Hedera SDK
+// because that uses `Ed25519PublicKeyParameters` which don't appear in the version of
+// BouncyCastle (1.60) that Corda *insists* on using (dependency on a newer version is overridden).
 class Ed25519PublicKey extends PublicKey {
     private final byte[] publicKeyBytes;
 

@@ -9,12 +9,16 @@ import net.corda.core.flows.NotarisationPayload;
 import net.corda.core.flows.NotarisationResponse;
 import net.corda.core.transactions.CoreTransaction;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
 import java.util.Collections;
 
 import co.paralleluniverse.fibers.Suspendable;
 
 public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
+    private static final Logger logger = LoggerFactory.getLogger(HcsNotaryServiceFlow.class);
 
     protected final HcsNotaryService notaryService;
     protected final FlowSession otherPartySession;
@@ -34,24 +38,24 @@ public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
 
         CoreTransaction txn = payload.getCoreTransaction();
 
-        System.out.println("received core txn: " + txn);
+        logger.trace("received core txn: " + txn);
 
         long seqNumber;
 
         try {
             seqNumber = notaryService.submitTransactionSpends(txn);
         } catch (HederaStatusException e) {
-            System.out.println("error trying to submit transaction" + e);
+            logger.error("error trying to submit transaction", e);
             throw new FlowException(e);
         }
 
-        System.out.println("sequence number: " + seqNumber);
+        logger.trace("sequence number: " + seqNumber);
 
         while (!notaryService.checkTransaction(txn, seqNumber)) {
             FlowLogic.sleep(Duration.ofSeconds(5));
         }
 
-        System.out.println("notarizing transaction " + txn.getId());
+        logger.trace("notarizing transaction " + txn.getId());
         otherPartySession.send(new NotarisationResponse(Collections.singletonList(notaryService.signTransaction(txn.getId()))));
 
         return null;

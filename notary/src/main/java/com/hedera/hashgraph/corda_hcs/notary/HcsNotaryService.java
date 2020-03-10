@@ -13,7 +13,6 @@ import com.hedera.hashgraph.sdk.mirror.MirrorConsensusTopicQuery;
 import com.hedera.hashgraph.sdk.mirror.MirrorConsensusTopicResponse;
 import com.hedera.hashgraph.sdk.mirror.MirrorSubscriptionHandle;
 import com.typesafe.config.Config;
-import com.typesafe.config.ConfigException;
 
 import net.corda.core.contracts.StateRef;
 import net.corda.core.crypto.Crypto;
@@ -32,8 +31,9 @@ import net.corda.core.transactions.CoreTransaction;
 import net.corda.node.services.api.ServiceHubInternal;
 import net.corda.node.services.config.NotaryConfig;
 
-import org.apache.shiro.codec.Hex;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.security.PublicKey;
 import java.time.Instant;
@@ -44,6 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 
 public abstract class HcsNotaryService extends NotaryService {
+    private static Logger logger = LoggerFactory.getLogger(HcsNotaryService.class);
+
     private final ServiceHubInternal serviceHubInternal;
     private final PublicKey publicKey;
     private final NotaryConfig notaryConfig;
@@ -125,20 +127,20 @@ public abstract class HcsNotaryService extends NotaryService {
     public abstract HcsNotaryServiceFlow createNotaryServiceFlow(@NotNull FlowSession otherSession);
 
     long submitTransactionSpends(CoreTransaction transaction) throws HederaStatusException {
-        System.out.println("submitting transaction spends");
+        logger.trace("submitting transaction spends");
 
         ConsensusMessageSubmitTransaction msgTxn = new ConsensusMessageSubmitTransaction()
                 .setTopicId(Objects.requireNonNull(topicId, "topic ID not set or created"));
 
-        System.out.println("serializing corda transaction");
+        logger.trace("serializing corda transaction");
 
         msgTxn.setMessage(new SerializeTransaction(transaction).serialize());
 
-        System.out.println("building transaction");
+        logger.trace("building transaction");
 
         Transaction hederaTxn = msgTxn.build(sdkClient);
 
-        System.out.println("submitting transaction to Hedera");
+        logger.trace("submitting transaction to Hedera");
 
         if (submitKeyBytes != null && submitPublicKey != null) {
             hederaTxn.signWith(submitPublicKey, m -> SigningUtils.sign(submitKeyBytes, m));
@@ -146,7 +148,7 @@ public abstract class HcsNotaryService extends NotaryService {
 
         TransactionId txnId = hederaTxn.execute(sdkClient);
 
-        System.out.println("transaction ID" + txnId);
+        logger.trace("transaction ID" + txnId);
 
         return txnId.getReceipt(sdkClient)
                 .getConsensusTopicSequenceNumber();
@@ -178,7 +180,7 @@ public abstract class HcsNotaryService extends NotaryService {
         }
 
         if (!consumedStates.isEmpty()) {
-            System.out.println("throwing error, consumed states: " + consumedStates);
+            logger.debug("throwing error, consumed states: " + consumedStates);
             throw new NotaryException(new NotaryError.Conflict(txn.getId(), consumedStates), txn.getId());
         }
 
@@ -192,11 +194,11 @@ public abstract class HcsNotaryService extends NotaryService {
 
 
     private void onMessage(MirrorConsensusTopicResponse msg) {
-        System.out.println("received consensus message " + msg);
+        logger.trace("received consensus message " + msg);
 
         SerializeTransaction txn = SerializeTransaction.deserialize(msg.message);
 
-        System.out.println("received transaction " + txn);
+        logger.trace("received transaction " + txn);
 
         for (StateRef input : txn.inputs) {
             // don't overwrite with duplicate destructions
@@ -220,7 +222,7 @@ public abstract class HcsNotaryService extends NotaryService {
                 TransactionId txnId = txn.execute(sdkClient);
                 topicId = txnId.getReceipt(sdkClient).getConsensusTopicId();
             } catch (HederaStatusException e) {
-                throw new RuntimeException(e);
+                throw new RuntimeException("failed to create topic", e);
             }
         }
 
@@ -231,7 +233,7 @@ public abstract class HcsNotaryService extends NotaryService {
                 .subscribe(
                         mirrorClient,
                         this::onMessage,
-                        e -> System.out.println("err: " + e)
+                        e -> logger.error("error on HCS subscribe", e)
                 );
     }
 
