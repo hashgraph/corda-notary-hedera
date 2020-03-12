@@ -1,4 +1,5 @@
-# hedera-hcs-corda
+hedera-hcs-corda
+================
 
 This library provides an implementation of a Notary Service for the [Corda] distributed ledger
 platform using the [Hedera Consensus Service (HCS)][HCS] to globally order transaction spends, 
@@ -8,7 +9,136 @@ network like BFTSmart.
 [Corda]: https://www.corda.net/
 [HCS]: https://www.hedera.com/consensus-service/
 
-### Functional Overview
+Usage
+---- 
+
+### Installation
+
+Add the following to your `build.gradle`: 
+```groovy
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "com.hedera.hashgraph:corda-hcs-notary:0.0.1"
+}
+```
+
+##### From Source
+
+Follow the above step, additionally adding `mavenLocal()` to the `repositories {}` block of your 
+`build.gradle` above `mavenCentral()`.
+
+Clone this repository:
+```bash
+git clone https://github.com/hashgraph/hedera-hcs-corda
+```
+
+Enter the `notary` directory and install the package to your local Maven repository:
+```bash
+cd hedera-hcs-corda/notary
+./gradlew install
+```
+
+### Creating a Notary
+
+In your project, create a class extending `HcsNotaryService`:
+
+```java
+package com.mypackage;
+
+public class MyNotaryService extends HcsNotaryService {
+    public MyNotaryService(ServiceHubInternal serviceHubInternal, PublicKey publicKey) {
+        super(serviceHubInternal, publicKey);
+    }
+}
+```
+
+Add the notary to your `task deployNodes(...) {}` configuration block and pass an 
+Hedera account ID and private key to use:
+```groovy
+task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
+    // ... 
+    node {
+        name "O=NotaryA,L=London,C=GB"
+        notary = [
+                validating: false,
+                className: "com.my_package.MyNotaryService",
+                extraConfig: [
+                        hcs: [
+                                // (required) the Hedera account ID that will pay for transactions
+                                // can also be just the accountNum as an int
+                                accountId: "0.0.####", 
+                                
+                                // (required) the hex-encoded Ed25519 private key for the given account
+                                privateKey: "<private key string here>",
+
+                                // (optional) the HCS topic ID to use
+                                // if omitted, a new topic is created on startup
+                                // can also be just the topicNum as an int
+                                topicId: "0.0.####", 
+
+                                // (optional) the Ed25519 private key for the HCS topic
+                                // if a topic ID was not specified, this will be the submit key to 
+                                // use with the one that will be created
+                                // if not specified for an existing topic that requires one,
+                                // flows will throw errors at runtime
+                                submitKey: "<private key string here>",
+
+                                // (optional) whether or not to connect to testnet instead of mainnet
+                                // defaults to false
+                                testnet: true | false
+                        ]
+                ]
+        ]
+    
+        // these ports must be unique in the network configuration
+        p2pPort 10002
+        rpcSettings {
+            address("localhost:10003")
+            adminAddress("localhost:10043")
+        }
+    }
+    // other nodes follow
+}
+```
+
+That's it! Your network is now protected from double-spends with HCS.
+
+### Creating a Validating Notary
+
+Similar to the non-validating notary above, except you begin by setting `validating: true` in your 
+notary node config and then override the appropriate methods:
+
+```java
+public class MyNotaryService extends HcsNotaryService {
+    public MyNotaryService(ServiceHubInternal serviceHubInternal, PublicKey publicKey) {
+        super(serviceHubInternal, publicKey);
+    }
+    
+    @Override
+    public HcsNotaryServiceFlow createNotaryServiceFlow(@NotNull FlowSession otherSession) {
+        return new MyNotaryServiceFlow(this, otherSession);
+    }
+}
+```
+
+```java
+public class MyNotaryServiceFlow extends HcsNotaryServiceFlow {
+    @Override
+    protected void validateTransaction(NotarisationPayload payload) throws FlowException {
+        // validate the transaction in the context of the contract(s) running on your current network
+        // throw a `NotaryError` if the validation fails
+    }
+}
+```
+
+More details on validating notary flows are available here: 
+https://docs.corda.net/tutorial-custom-notary.html
+
+Functional Overview
+-------------------
 
 This project provides an abstract base class extending `NotaryService` which by default functions
 as a non-validating notary only, using HCS to prevent double-spends. However, the `HcsNotaryService`
