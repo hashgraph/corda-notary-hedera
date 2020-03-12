@@ -92,14 +92,17 @@ public final class HcsConfig {
         }
 
         if (submitKey != null) {
-            this.submitKey = Hex.decode(submitKey);
-
-            if (this.submitKey.length != Ed25519.SECRET_KEY_SIZE) {
+            if (submitKey.length() >= 96 && submitKey.startsWith("302e020100300506032b657004220420")) {
+                // DER-prefixed private key with optional public key data
+                this.submitKey = Hex.decode(submitKey.substring(32, 96));
+            } else if(submitKey.length() == 64) {
+                // raw key
+                this.submitKey = Hex.decode(submitKey);
+            } else {
                 throw new ConfigException.BadValue(
                         config.origin(),
                         "hcs.submitKey",
-                        "must be 64 hex characters; if you have a 96-character private key "
-                                + "from the SDK then you must trim the first 32 characters");
+                        "not a valid hex-encoded Ed25519 private key");
             }
         } else {
             this.submitKey = null;
