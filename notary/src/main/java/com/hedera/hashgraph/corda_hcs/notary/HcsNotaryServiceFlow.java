@@ -17,7 +17,7 @@ import java.util.Collections;
 
 import co.paralleluniverse.fibers.Suspendable;
 
-public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
+public class HcsNotaryServiceFlow extends FlowLogic<Void> {
     private static final Logger logger = LoggerFactory.getLogger(HcsNotaryServiceFlow.class);
 
     protected final HcsNotaryService notaryService;
@@ -65,8 +65,12 @@ public abstract class HcsNotaryServiceFlow extends FlowLogic<Void> {
     /**
      * Validate that the transaction in the given payload is valid for the current contract.
      *
+     * <b>Note:</b> this is a no-op by default.
+     *
      * @param payload
      * @throws FlowException
      */
-    protected abstract void validateTransaction(NotarisationPayload payload) throws FlowException;
+    protected void validateTransaction(NotarisationPayload payload) throws FlowException {
+        logger.trace("no validation done");
+    }
 }

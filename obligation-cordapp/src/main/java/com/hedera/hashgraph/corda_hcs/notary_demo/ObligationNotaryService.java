@@ -26,14 +26,4 @@ public class ObligationNotaryService extends HcsNotaryService {
     public ObligationNotaryService(ServiceHubInternal serviceHubInternal, PublicKey publicKey) {
         super(serviceHubInternal, publicKey);
     }
-
-    @Override
-    public HcsNotaryServiceFlow createNotaryServiceFlow(@NotNull FlowSession otherSession) {
-        return new HcsNotaryServiceFlow(this, otherSession) {
-            @Override
-            protected void validateTransaction(NotarisationPayload payload) throws FlowException {
-                logger.debug("received transaction " + payload.getCoreTransaction());
-            }
-        };
-    }
 }

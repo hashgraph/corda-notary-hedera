@@ -20,8 +20,10 @@ import net.corda.core.crypto.SecureHash;
 import net.corda.core.crypto.SignableData;
 import net.corda.core.crypto.SignatureMetadata;
 import net.corda.core.crypto.TransactionSignature;
+import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
 import net.corda.core.flows.FlowSession;
+import net.corda.core.flows.NotarisationPayload;
 import net.corda.core.flows.NotaryError;
 import net.corda.core.flows.NotaryException;
 import net.corda.core.flows.StateConsumptionDetails;
@@ -124,7 +126,16 @@ public abstract class HcsNotaryService extends NotaryService {
         return createNotaryServiceFlow(otherPartySession);
     }
 
-    public abstract HcsNotaryServiceFlow createNotaryServiceFlow(@NotNull FlowSession otherSession);
+    /**
+     * Override this method to provide a subclass of {@link HcsNotaryServiceFlow} which validates
+     * the transaction locally.
+     *
+     * @param otherSession
+     * @return
+     */
+    public HcsNotaryServiceFlow createNotaryServiceFlow(@NotNull FlowSession otherSession) {
+        return new HcsNotaryServiceFlow(this, otherSession);
+    }
 
     long submitTransactionSpends(CoreTransaction transaction) throws HederaStatusException {
         logger.trace("submitting transaction spends");
