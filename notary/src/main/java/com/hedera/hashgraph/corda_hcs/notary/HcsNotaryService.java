@@ -20,10 +20,8 @@ import net.corda.core.crypto.SecureHash;
 import net.corda.core.crypto.SignableData;
 import net.corda.core.crypto.SignatureMetadata;
 import net.corda.core.crypto.TransactionSignature;
-import net.corda.core.flows.FlowException;
 import net.corda.core.flows.FlowLogic;
 import net.corda.core.flows.FlowSession;
-import net.corda.core.flows.NotarisationPayload;
 import net.corda.core.flows.NotaryError;
 import net.corda.core.flows.NotaryException;
 import net.corda.core.flows.StateConsumptionDetails;
@@ -72,6 +70,8 @@ public abstract class HcsNotaryService extends NotaryService {
     private final ConcurrentHashMap<StateRef, StateDestruction> stateDestructions = new ConcurrentHashMap<>();
 
     private long sequenceNumber = -1;
+    // your application may want to consider the topic's entire history instead
+    private Instant lastMsgTimestamp = Instant.now();
 
     @Nullable
     private MirrorSubscriptionHandle subscriptionHandle;
@@ -217,6 +217,7 @@ public abstract class HcsNotaryService extends NotaryService {
         }
 
         sequenceNumber = msg.sequenceNumber;
+        lastMsgTimestamp = msg.consensusTimestamp;
     }
 
     @Override
@@ -237,14 +238,25 @@ public abstract class HcsNotaryService extends NotaryService {
             }
         }
 
+        resubscribe();
+    }
+
+    private void resubscribe() {
+        if (topicId == null) {
+            return;
+        }
+
         subscriptionHandle = new MirrorConsensusTopicQuery()
                 .setTopicId(topicId)
-                // for demo purposes we don't care about any states before the notary started
-                .setStartTime(Instant.now())
+                // start immediately after the last message we received
+                .setStartTime(lastMsgTimestamp.plusNanos(1))
                 .subscribe(
                         mirrorClient,
                         this::onMessage,
-                        e -> logger.error("error on HCS subscribe", e)
+                        e -> {
+                            logger.error("error on HCS subscribe", e);
+                            resubscribe();
+                        }
                 );
     }
 
